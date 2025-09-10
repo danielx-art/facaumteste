@@ -36,7 +36,7 @@ export const organizations = createTable("organization", {
   ownerId: uuid("owner_id").references(() => users.id, {
     onDelete: "set null",
   }),
-  // Organization catalog/settings (e.g., catalog policy or allowed subject roots)
+  // Org catalog/settings (e.g., catalog policy or allowed subject roots)
   settings: jsonb("settings")
     .$type<{
       catalogPolicy?: {
@@ -78,7 +78,7 @@ export const organizationMembers = createTable(
 );
 
 /* ========== GROUPS (Turmas) ========== */
-export const groups = createTable("group", {
+export const orgGroups = createTable("org_group", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
     .references(() => organizations.id, { onDelete: "cascade" })
@@ -90,11 +90,11 @@ export const groups = createTable("group", {
     .notNull(),
 });
 
-export const groupMembers = createTable(
-  "group_member",
+export const orgGroupMembers = createTable(
+  "org_group_member",
   {
     groupId: uuid("group_id")
-      .references(() => groups.id, { onDelete: "cascade" })
+      .references(() => orgGroups.id, { onDelete: "cascade" })
       .notNull(),
     userId: uuid("user_id")
       .references(() => users.id, { onDelete: "cascade" })
@@ -103,11 +103,14 @@ export const groupMembers = createTable(
       .default(sql`CURRENT_TIMESTAMP`)
       .notNull(),
   },
-  (t) => [
-    primaryKey({ columns: [t.groupId, t.userId], name: "group_member_pk" }),
-    index("group_member_group_idx").on(t.groupId),
-    index("group_member_user_idx").on(t.userId),
-  ],
+   (t) => [
+    primaryKey({
+      columns: [t.groupId, t.userId],
+      name: "org_group_member_pk",
+    }),
+    index("org_group_member_group_idx").on(t.groupId),
+    index("org_group_member_user_idx").on(t.userId),
+  ]
 );
 
 /* ========== SUBJECTS (Tree, Scoped) ========== */
@@ -115,13 +118,15 @@ export const subjects = createTable(
   "subject",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(), // added for UI friendliness
     slug: varchar("slug", { length: 255 }).notNull(), // unique per scope/owner
     description: text("description"),
 
     // Tree structure
     parentId: uuid("parent_id"),
 
-    scope: varchar("scope", { length: 20 }).notNull().default("global"), // global | organization | user
+    // Scope: global | organization | user
+    scope: varchar("scope", { length: 20 }).notNull().default("global"),
     ownerOrganizationId: uuid("owner_org_id").references(() => organizations.id, {
       onDelete: "cascade",
     }),
@@ -134,8 +139,6 @@ export const subjects = createTable(
       .notNull(),
   },
   (t) => [
-    // For strict uniqueness per scope, I have to enforce in app
-    // or add partial unique indexes via raw SQL migrations.
     index("subject_scope_idx").on(t.scope),
     index("subject_org_slug_idx").on(t.ownerOrganizationId, t.slug),
     index("subject_user_slug_idx").on(t.ownerUserId, t.slug),
@@ -149,10 +152,12 @@ export const skills = createTable(
   "skill",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    slug: varchar("slug", { length: 64 }), // "C1-H1"
+    name: varchar("name", { length: 255 }).notNull(), // added for UI friendliness
+    slug: varchar("slug", { length: 64 }).notNull(), // e.g., "C1-H1" or any readable code
     description: text("description"),
 
-    scope: varchar("scope", { length: 20 }).notNull().default("global"), // global | organization | user
+    // Scope: global | organization | user
+    scope: varchar("scope", { length: 20 }).notNull().default("global"),
     ownerOrganizationId: uuid("owner_org_id").references(() => organizations.id, {
       onDelete: "cascade",
     }),
@@ -315,7 +320,7 @@ export const evaluations = createTable(
       .$type<{
         accessMode: "private" | "link" | "public";
         requireAuthToRespond: boolean;
-        participantScope: "any" | "org_members" | "groups" | "invited"; // each one restricts more
+        participantScope: "any" | "org_members" | "groups" | "invited";
         allowedGroups?: string[]; // groupIds
         invitedList?: string[]; // userIds or emails
         linkTokenHash?: string; // required if mode = "link"
@@ -381,7 +386,7 @@ export const evaluationItems = createTable(
       .references(() => items.id, { onDelete: "restrict" }) // do not delete item when evaluation is deleted
       .notNull(),
     order: integer("order").notNull(),
-    points: integer("points").default(10), // to make it non binary since it is an int
+    points: integer("points").default(10), // non-binary int
     settings: jsonb("settings").default({}),
   },
   (t) => [
@@ -411,7 +416,7 @@ export const responses = createTable(
 
     // Answer data
     answer: jsonb("answer").notNull(), // varies by item type
-    isCorrect: boolean("is_correct"), // some responses, like polls, dont have wrong answers
+    isCorrect: boolean("is_correct"), // polls etc. may be null
     score: integer("score").default(0),
     timeSpent: integer("time_spent"),
 
@@ -430,21 +435,32 @@ export const responses = createTable(
 /* ========== RELATIONS (Drizzle metadata) ========== */
 export const usersRelations = relations(users, ({ many }) => ({
   orgMemberships: many(organizationMembers),
-  groupMemberships: many(groupMembers),
+  groupMemberships: many(orgGroupMembers),
 }));
 
 export const organizationsRelations = relations(organizations, ({ one, many }) => ({
   owner: one(users, { fields: [organizations.ownerId], references: [users.id] }),
   members: many(organizationMembers),
-  groups: many(groups),
+  groups: many(orgGroups),
 }));
 
-export const groupsRelations = relations(groups, ({ one, many }) => ({
+export const orgGroupsRelations = relations(orgGroups, ({ one, many }) => ({
   organization: one(organizations, {
-    fields: [groups.organizationId],
+    fields: [orgGroups.organizationId],
     references: [organizations.id],
   }),
-  members: many(groupMembers),
+  members: many(orgGroupMembers),
+}));
+
+export const orgGroupMembersRelations = relations(orgGroupMembers, ({ one }) => ({
+  group: one(orgGroups, {
+    fields: [orgGroupMembers.groupId],
+    references: [orgGroups.id],
+  }),
+  user: one(users, {
+    fields: [orgGroupMembers.userId],
+    references: [users.id],
+  }),
 }));
 
 export const subjectsRelations = relations(subjects, ({ one, many }) => ({
@@ -467,6 +483,17 @@ export const itemsRelations = relations(items, ({ many }) => ({
   skillLinks: many(itemSkills),
   evaluationItems: many(evaluationItems),
   responses: many(responses),
+}));
+
+export const itemsOwnerRelations = relations(items, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [items.organizationId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [items.createdBy],
+    references: [users.id],
+  }),
 }));
 
 export const itemVersionsRelations = relations(itemVersions, ({ one }) => ({
