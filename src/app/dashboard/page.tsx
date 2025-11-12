@@ -7,12 +7,13 @@ export default async function DashboardPage() {
 
   console.log("DashboardPage - user data:", data, "error:", error); //test
 
-  if (error || !data?.user) redirect("/");
+  //if (error || !data?.user) redirect("/"); //test
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Dashboard</h1>
-      <p>Logged in as: {data?.user?.email ?? "Unknown User"}</p>
-    </div>
+    <>
+      <nav>Hello</nav>
+      <main>World</main>
+      <footer>Cmon</footer>
+    </>
   );
 }

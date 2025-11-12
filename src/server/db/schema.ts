@@ -117,7 +117,7 @@ export const orgGroupMembers = createTable(
 export const subjects = createTable(
   "subject",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey(),
     name: varchar("name", { length: 255 }).notNull(), // added for UI friendliness
     slug: varchar("slug", { length: 255 }).notNull(), // unique per scope/owner
     description: text("description"),

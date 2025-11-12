@@ -16,5 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/auth/error", url.origin));
   }
 
+  // code to insert the user into db
+
   return NextResponse.redirect(new URL(next, url.origin));
 }
