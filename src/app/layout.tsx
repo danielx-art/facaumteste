@@ -4,6 +4,7 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
+import { LastLocationTracker } from "~/components/LastLocationTracker";
 
 export const metadata: Metadata = {
   title: "Faça um teste",
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geist.variable}`}>
       <body>
+        <LastLocationTracker />
         <TRPCReactProvider>{children}</TRPCReactProvider>
       </body>
     </html>

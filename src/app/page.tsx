@@ -1,12 +1,11 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
 import LoginButton from "~/components/LoginButton";
 import { Button } from "~/components/ui/button";
 import { createSupabaseServerClient } from "~/server/supabaseServer";
 import { Info } from "lucide-react";
 
 // import { LatestPost } from "~/app/_components/post";
-import { api, HydrateClient } from "~/trpc/server";
+import { HydrateClient } from "~/trpc/server";
+import { LastLocationRestorer } from "~/components/LastLocationRestores";
 
 export default async function Home() {
   // const hello = await api.post.hello({ text: "from tRPC" });
@@ -20,6 +19,7 @@ export default async function Home() {
 
   return (
     <HydrateClient>
+      <LastLocationRestorer fallback="/dashboard" />
       <main className="flex min-h-screen flex-col items-center justify-center">
         <span className="min-w-full flex items-center justify-center gap-2 p-2">
           <span className="hidden sm:flex flex-1 justify-center">

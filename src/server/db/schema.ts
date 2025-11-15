@@ -12,14 +12,14 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-export const createTable = pgTableCreator((name) => `cms_${name}`);
+export const createTable = pgTableCreator((name) => `facaumteste_${name}`);
 
 /* ========== USERS ========== */
 export const users = createTable("user", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
-  role: varchar("role", { length: 50 }).notNull().default("editor"), // system role: admin|editor|respondent
+  role: varchar("role", { length: 50 }).notNull().default("default"), // "maybe super/admin or support"
   createdAt: timestamp("created_at", { withTimezone: true })
     .default(sql`CURRENT_TIMESTAMP`)
     .notNull(),
@@ -62,7 +62,7 @@ export const organizationMembers = createTable(
     userId: uuid("user_id")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
-    role: varchar("role", { length: 32 }).notNull().default("editor"), // owner|admin|editor|viewer
+    role: varchar("role", { length: 32 }).notNull().default("editor"), // owner|admin|editor|viewer|student
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`CURRENT_TIMESTAMP`)
       .notNull(),
@@ -99,6 +99,7 @@ export const orgGroupMembers = createTable(
     userId: uuid("user_id")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
+    role: varchar("role", { length: 32 }).notNull().default("editor"), // admin|editor|student
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`CURRENT_TIMESTAMP`)
       .notNull(),
@@ -432,6 +433,62 @@ export const responses = createTable(
   ],
 );
 
+
+/* ========== PERMISSIONS =========== */
+export const evaluationPermissions = createTable(
+  "evaluation_permission",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    evaluationId: uuid("evaluation_id")
+      .references(() => evaluations.id, { onDelete: "cascade" })
+      .notNull(),
+
+    principalType: varchar("principal_type", { length: 10 }).notNull(), // concede this permission to a "user" | "org" | "group" 
+    principalId: uuid("principal_id").notNull(),
+
+    canEdit: boolean("can_edit").notNull().default(false),
+    canView: boolean("can_view").notNull().default(true),
+    canViewResults: boolean("can_view_results").notNull().default(false),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+  },
+  (t) => [
+    index("evaluation_permission_eval_idx").on(t.evaluationId),
+    index("evaluation_permission_principal_idx").on(
+      t.principalType,
+      t.principalId,
+    ),
+  ],
+);
+
+export const itemPermissions = createTable(
+  "item_permission",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    itemId: uuid("item_id")
+      .references(() => items.id, { onDelete: "cascade" })
+      .notNull(),
+
+    principalType: varchar("principal_type", { length: 10 }).notNull(), // "user" | "org" | "group"
+    principalId: uuid("principal_id").notNull(),
+
+    canEdit: boolean("can_edit").notNull().default(false),
+    canView: boolean("can_view").notNull().default(true),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+  },
+  (t) => [
+    index("item_permission_item_idx").on(t.itemId),
+    index("item_permission_principal_idx").on(t.principalType, t.principalId),
+  ],
+);
+
 /* ========== RELATIONS (Drizzle metadata) ========== */
 export const usersRelations = relations(users, ({ many }) => ({
   orgMemberships: many(organizationMembers),
@@ -542,4 +599,21 @@ export const responsesRelations = relations(responses, ({ one }) => ({
   }),
   item: one(items, { fields: [responses.itemId], references: [items.id] }),
   respondent: one(users, { fields: [responses.respondentId], references: [users.id] }),
+}));
+
+export const evaluationPermissionsRelations = relations(
+  evaluationPermissions,
+  ({ one }) => ({
+    evaluation: one(evaluations, {
+      fields: [evaluationPermissions.evaluationId],
+      references: [evaluations.id],
+    }),
+  }),
+);
+
+export const itemPermissionsRelations = relations(itemPermissions, ({ one }) => ({
+  item: one(items, {
+    fields: [itemPermissions.itemId],
+    references: [items.id],
+  }),
 }));
